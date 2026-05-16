@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { formatCurrency, formatDateTime } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import UndoButton from './UndoButton'
 import QrCodeDisplay from './QrCodeDisplay'
 
@@ -41,7 +41,7 @@ export default async function CustomerDetailPage({
   })
   const balance = running
 
-  const customerUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/c/${merchant.id}?mobile=${encodeURIComponent(customer.mobile)}`
+  const customerUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/account/${customer.id}`
 
   return (
     <div className="max-w-2xl">
@@ -86,14 +86,14 @@ export default async function CustomerDetailPage({
                 <p className="text-sm font-medium truncate">
                   {t.type === 'topup' ? '↑ Top-up' : t.service_name || 'Service'}
                 </p>
-                <p className="text-xs text-gray-400">{formatDateTime(t.created_at)}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{formatDate(t.created_at)}</p>
                 {t.notes && <p className="text-xs text-gray-400 italic">{t.notes}</p>}
               </div>
               <div className="text-right shrink-0">
                 <p className={`text-sm font-semibold ${t.delta > 0 ? 'text-green-600' : 'text-gray-900'}`}>
                   {t.delta > 0 ? '+' : ''}{formatCurrency(t.delta)}
                 </p>
-                <p className="text-xs text-gray-400">bal. {formatCurrency(t.balanceAfter)}</p>
+                <p className="text-xs text-gray-400 mt-0.5">bal. {formatCurrency(t.balanceAfter)}</p>
               </div>
               <UndoButton transactionId={t.id} />
             </div>
