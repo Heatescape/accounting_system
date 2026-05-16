@@ -28,16 +28,21 @@ export default function LoginPage() {
         router.refresh()
       }
     } else {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: { data: { business_name: businessName } },
       })
       if (error) {
         setError(error.message)
-      } else {
+      } else if (data.session) {
+        // Email confirmation disabled — signed in immediately
         router.push('/admin')
         router.refresh()
+      } else {
+        // Email confirmation required
+        setError('Account created! Check your email to confirm, then sign in.')
+        setMode('login')
       }
     }
     setLoading(false)
