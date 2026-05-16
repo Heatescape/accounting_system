@@ -68,10 +68,12 @@ create policy "merchant own transactions" on transactions
 -- ============================================================
 -- Helper function: auto-create merchant record on signup
 -- ============================================================
-create or replace function handle_new_user()
-returns trigger language plpgsql security definer as $$
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer
+set search_path = ''
+as $$
 begin
-  insert into merchants (auth_user_id, business_name)
+  insert into public.merchants (auth_user_id, business_name)
   values (new.id, coalesce(new.raw_user_meta_data->>'business_name', 'My Business'));
   return new;
 end;
