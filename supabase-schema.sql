@@ -65,6 +65,24 @@ create policy "merchant own transactions" on transactions
     )
   );
 
+-- Services (pre-configured menu items with prices)
+create table if not exists services (
+  id uuid primary key default gen_random_uuid(),
+  merchant_id uuid references merchants(id) on delete cascade not null,
+  name text not null,
+  price numeric(10,2) not null check (price >= 0),
+  created_at timestamptz default now() not null
+);
+
+alter table services enable row level security;
+
+create policy "merchant own services" on services
+  for all using (
+    merchant_id in (
+      select id from merchants where auth_user_id = auth.uid()
+    )
+  );
+
 -- ============================================================
 -- Helper function: auto-create merchant record on signup
 -- ============================================================

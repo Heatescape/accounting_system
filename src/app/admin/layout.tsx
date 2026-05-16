@@ -28,6 +28,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               <Link href="/admin/transactions/new" className="text-gray-600 hover:text-gray-900">
                 New Transaction
               </Link>
+              <Link href="/admin/services" className="text-gray-600 hover:text-gray-900">
+                Services
+              </Link>
             </nav>
           </div>
           <form action="/api/auth/logout" method="POST">

@@ -1,19 +1,21 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Suspense } from 'react'
 
 type Customer = { id: string; name: string; mobile: string }
+type Service = { id: string; name: string; price: number }
 
 function NewTransactionForm() {
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [services, setServices] = useState<Service[]>([])
   const [customerId, setCustomerId] = useState('')
   const [type, setType] = useState<'topup' | 'consumption'>('consumption')
-  const [amount, setAmount] = useState('')
+  const [selectedServiceId, setSelectedServiceId] = useState('')
   const [serviceName, setServiceName] = useState('')
+  const [amount, setAmount] = useState('')
   const [notes, setNotes] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -23,13 +25,27 @@ function NewTransactionForm() {
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase.from('customers').select('id, name, mobile').order('name')
-      setCustomers(data ?? [])
+      const [{ data: c }, { data: s }] = await Promise.all([
+        supabase.from('customers').select('id, name, mobile').order('name'),
+        supabase.from('services').select('id, name, price').order('name'),
+      ])
+      setCustomers(c ?? [])
+      setServices(s ?? [])
       const preselect = searchParams.get('customerId')
       if (preselect) setCustomerId(preselect)
     }
     load()
   }, [])
+
+  function handleServiceSelect(serviceId: string) {
+    setSelectedServiceId(serviceId)
+    if (!serviceId) return
+    const svc = services.find(s => s.id === serviceId)
+    if (svc) {
+      setServiceName(svc.name)
+      setAmount(svc.price.toFixed(2))
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -51,7 +67,7 @@ function NewTransactionForm() {
       merchant_id: merchant.id,
       type,
       amount: amountVal,
-      service_name: type === 'consumption' ? serviceName.trim() || null : null,
+      service_name: type === 'consumption' ? (serviceName.trim() || null) : null,
       notes: notes.trim() || null,
     })
 
@@ -72,6 +88,7 @@ function NewTransactionForm() {
       <h1 className="text-xl font-semibold mb-6">Record Transaction</h1>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Customer */}
         <div>
           <label className="block text-sm font-medium mb-1">Customer</label>
           <select
@@ -87,6 +104,7 @@ function NewTransactionForm() {
           </select>
         </div>
 
+        {/* Type toggle */}
         <div>
           <label className="block text-sm font-medium mb-2">Type</label>
           <div className="flex gap-2">
@@ -94,32 +112,66 @@ function NewTransactionForm() {
               <button
                 key={t}
                 type="button"
-                onClick={() => setType(t)}
+                onClick={() => { setType(t); setSelectedServiceId(''); setServiceName(''); setAmount('') }}
                 className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
                   type === t
                     ? 'bg-gray-900 text-white border-gray-900'
                     : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                 }`}
               >
-                {t === 'consumption' ? 'Service / Consumption' : 'Top-up'}
+                {t === 'consumption' ? 'Service' : 'Top-up'}
               </button>
             ))}
           </div>
         </div>
 
+        {/* Service picker (consumption only) */}
         {type === 'consumption' && (
           <div>
-            <label className="block text-sm font-medium mb-1">Service Name</label>
-            <input
-              type="text"
-              value={serviceName}
-              onChange={e => setServiceName(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-              placeholder="e.g. Facial Treatment, Manicure"
-            />
+            <label className="block text-sm font-medium mb-1">Service</label>
+            {services.length > 0 ? (
+              <>
+                <select
+                  value={selectedServiceId}
+                  onChange={e => handleServiceSelect(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white mb-2"
+                >
+                  <option value="">Select from menu…</option>
+                  {services.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} — ${Number(s.price).toFixed(2)}
+                    </option>
+                  ))}
+                  <option value="__custom__">Custom (type manually)</option>
+                </select>
+                {(selectedServiceId === '__custom__' || !selectedServiceId) && (
+                  <input
+                    type="text"
+                    value={serviceName}
+                    onChange={e => setServiceName(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    placeholder="Service name (optional)"
+                  />
+                )}
+              </>
+            ) : (
+              <div className="space-y-1">
+                <input
+                  type="text"
+                  value={serviceName}
+                  onChange={e => setServiceName(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  placeholder="e.g. HydraFacial"
+                />
+                <p className="text-xs text-gray-400">
+                  <Link href="/admin/services" className="underline">Add services to your menu</Link> to select with auto-fill price.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
+        {/* Amount */}
         <div>
           <label className="block text-sm font-medium mb-1">Amount (AUD)</label>
           <div className="relative">
@@ -130,13 +182,14 @@ function NewTransactionForm() {
               step="0.01"
               min="0.01"
               value={amount}
-              onChange={e => setAmount(e.target.value)}
+              onChange={e => { setAmount(e.target.value); setSelectedServiceId('__custom__') }}
               className="w-full border border-gray-300 rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
               placeholder="0.00"
             />
           </div>
         </div>
 
+        {/* Notes */}
         <div>
           <label className="block text-sm font-medium mb-1">Notes (optional)</label>
           <input
